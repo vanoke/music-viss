@@ -2,6 +2,7 @@
 Точка входа приложения Music Visualizer + Lyrics Sync.
 
 Относится к Модулю 1, тема 1.1 (знакомство с Qt/Quick).
+Плюс регистрация Python-моста (Модуль 4.1).
 """
 
 import sys
@@ -10,22 +11,32 @@ from pathlib import Path
 from PySide6.QtGui import QGuiApplication
 from PySide6.QtQml import QQmlApplicationEngine
 
+from backend.bridge import Bridge
+
 
 def main() -> int:
-    # QGuiApplication - базовое приложение Qt, одно на процесс
     app = QGuiApplication(sys.argv)
 
-    # Движок QML: загрузит qml/main.qml и построит по нему дерево объектов
+    project_root = Path(__file__).parent
+
+    # Папка кэша обложек - создается при запуске, если ее нет
+    covers_dir = project_root / "data" / "covers"
+    covers_dir.mkdir(parents=True, exist_ok=True)
+
+    # Создание моста QML-Python
+    bridge = Bridge(covers_dir)
+
     engine = QQmlApplicationEngine()
 
-    # Путь к main.qml через Path(__file__).parent так путь не зависит от того, из какой папки запущен скрипт
-    qml_file = Path(__file__).parent / "qml" / "main.qml"
+    # Регистрация моста ДО загрузки QML, иначе ReferenceError
+    engine.rootContext().setContextProperty("bridge", bridge)
+
+    qml_file = project_root / "qml" / "main.qml"
     engine.load(qml_file)
 
     if not engine.rootObjects():
         return -1
 
-    # Цикл обработки событий - здесь приложение живёт, пока не закроют окно.
     return app.exec()
 
 

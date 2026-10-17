@@ -1,5 +1,5 @@
-// Главное окно: логика плеера + компоновка UI из компонентов
-
+// Этап 4: интеграция с Python (mutagen)
+// Модуль 2.4 (Компоненты), 4.1 (Работа с файлами), мост QML-Python
 
 import QtQuick
 import QtQuick.Controls
@@ -19,7 +19,7 @@ ApplicationWindow {
     Material.theme: Material.Dark
     Material.accent: Material.Blue
 
-    //    ЛОГИКА
+    //      ЛОГИКА
 
     // МЕДИАПЛЕЕР
     MediaPlayer {
@@ -34,7 +34,7 @@ ApplicationWindow {
             console.log("MediaPlayer error:", error, errorString)
         }
 
-        // По окончании трека автоматический переход к следующему
+        // По окончании трека автоматически переход к следующему
         onMediaStatusChanged: {
             if (mediaStatus === MediaPlayer.EndOfMedia) {
                 root.nextTrack()
@@ -60,6 +60,7 @@ ApplicationWindow {
     }
 
     // ТАЙМЕР СМЕНЫ ТРЕКА
+    // за это время FFmpeg освободит поток
     Timer {
         id: switchTrackTimer
         interval: 50
@@ -78,6 +79,9 @@ ApplicationWindow {
 
     property int currentTrackIndex: -1
 
+    // Свойства для слайдера: при перетаскивании - игнор player.position. от дергания. теперь в PlayerControls.qml 
+    // УТИЛИТА: миллисекунды в "м:сс" теперь в PlayerControls.qml
+
     // УТИЛИТА: имя файла из URL
     function fileNameFromUrl(url) {
         var parts = url.toString().split("/")
@@ -89,6 +93,7 @@ ApplicationWindow {
         if (index < 0 || index >= playlistModel.count) return
         currentTrackIndex = index
 
+        // Резкое заглушение
         fadeIn.stop()
         audioOut.volume = 0
 
@@ -120,10 +125,19 @@ ApplicationWindow {
 
         onAccepted: {
             for (var i = 0; i < selectedFiles.length; i++) {
-                var url = selectedFiles[i]
+                var url = selectedFiles[i].toString()
+
+                // ЭТАП 4 МОСТ. вызов Python-моста для чтения тегов
+                // bridge.readTags(url) возвращает объект {title, artist, coverPath}
+                var tags = bridge.readTags(url)
+
                 playlistModel.append({
-                    title: fileNameFromUrl(url),
-                    path: url.toString()
+                    // Если тега нет (tags.title пустой), используем имя файла
+                    title: tags.title || fileNameFromUrl(url),
+                    // сохранение исполнителя и путь к обложке в модель
+                    artist: tags.artist || "",
+                    coverPath: tags.coverPath || "",
+                    path: url
                 })
             }
             if (currentTrackIndex === -1 && playlistModel.count > 0) {
@@ -132,7 +146,7 @@ ApplicationWindow {
         }
     }
 
-    // UI 
+    //      UI
     Rectangle {
         anchors.fill: parent
         color: "#1e1e2e"
@@ -173,7 +187,8 @@ ApplicationWindow {
                 }
             }
 
-            // Список
+            // ПЛЕЙЛИСТ
+            // Компонент получает модель и индекс, а при клике отправляет сигнал trackClicked
             PlaylistView {
                 width: parent.width
                 height: 200
@@ -182,7 +197,8 @@ ApplicationWindow {
                 onTrackClicked: root.playTrackAt(index)
             }
 
-            // Управление
+            // СЛАЙДЕР ПОЗИЦИИ и КНОПКИ УПРАВЛЕНИЯ
+            // Компонент получает плеер и аудиовыход, а наружу отправляет сигналы
             PlayerControls {
                 width: parent.width
                 player: player

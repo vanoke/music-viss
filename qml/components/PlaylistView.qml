@@ -7,7 +7,7 @@ import QtQuick.Controls.Material
 Rectangle {
     id: root
 
-    // Модель передаётся снаружи - компонент не знает, откуда она.
+    // Модель передаётся снаружи - компонент не знает, откуда она
     property var listModel: null
     // Индекс текущего трека для подсветки
     property int currentIndex: -1
@@ -40,7 +40,8 @@ Rectangle {
                 anchors.leftMargin: 12
                 anchors.right: parent.right
                 anchors.rightMargin: 12
-                text: (index + 1) + ". " + title
+                // artist может быть пустой, тогда только название
+                text: (index + 1) + ". " + title + (artist ? " — " + artist : "")
                 color: "white"
                 font.pixelSize: 14
                 elide: Text.ElideRight
@@ -53,7 +54,7 @@ Rectangle {
         }
     }
 
-    // Заглушка, когда плейлист пуст.
+    // Заглушка, когда плейлист пуст
     Text {
         anchors.centerIn: parent
         visible: root.listModel !== null && root.listModel.count === 0

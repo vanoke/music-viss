@@ -1,0 +1,27 @@
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+.venv/
+venv/
+env/
+
+# IDE
+.vscode/
+.idea/
+
+# Данные приложения (БД создаётся при запуске)
+data/*.db
+data/*.sqlite
+data/*.sqlite3
+
+# Кэш обложек (скачиваются из интернета, локальные)
+data/covers/
+
+# Локальные артефакты QML-компиляции
+*.qmlc
+*.jsc
+
+# ОС
+Thumbs.db
+.DS_Store

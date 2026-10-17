@@ -1,11 +1,12 @@
-// Этап 3: плейлист на ListModel + ListView.
-// Модуль 2.5 (Модели), 2.6 (Представления), 1.6 (Позиционирование).
+// Главное окно: логика плеера + компоновка UI из компонентов
+
 
 import QtQuick
 import QtQuick.Controls
 import QtQuick.Controls.Material
 import QtQuick.Dialogs
 import QtMultimedia
+import "components"
 
 ApplicationWindow {
     id: root
@@ -17,6 +18,8 @@ ApplicationWindow {
 
     Material.theme: Material.Dark
     Material.accent: Material.Blue
+
+    //    ЛОГИКА
 
     // МЕДИАПЛЕЕР
     MediaPlayer {
@@ -31,7 +34,7 @@ ApplicationWindow {
             console.log("MediaPlayer error:", error, errorString)
         }
 
-        // По окончании трека автоматически переход к следующему
+        // По окончании трека автоматический переход к следующему
         onMediaStatusChanged: {
             if (mediaStatus === MediaPlayer.EndOfMedia) {
                 root.nextTrack()
@@ -40,7 +43,6 @@ ApplicationWindow {
     }
 
     // ПЛАВНОЕ НАРАСТАНИЕ ПОСЛЕ СТАРТА
-    // резкая заглушка перед сменой, тут плавный возврат.
     NumberAnimation {
         id: fadeIn
         target: audioOut
@@ -58,7 +60,6 @@ ApplicationWindow {
     }
 
     // ТАЙМЕР СМЕНЫ ТРЕКА
-    // 50 мс после приглушения — за это время FFmpeg освободит поток.
     Timer {
         id: switchTrackTimer
         interval: 50
@@ -77,19 +78,6 @@ ApplicationWindow {
 
     property int currentTrackIndex: -1
 
-    // Свойства для слайдера: при перетаскивании — игнор player.position. от дергания.
-    property bool isSeeking: false
-    property real seekValue: 0
-
-    // УТИЛИТА: миллисекунды в "м:сс"
-    function fmt(ms) {
-        if (!ms || ms < 0) return "0:00"
-        var totalSec = Math.floor(ms / 1000)
-        var m = Math.floor(totalSec / 60)
-        var s = totalSec % 60
-        return m + ":" + (s < 10 ? "0" : "") + s
-    }
-
     // УТИЛИТА: имя файла из URL
     function fileNameFromUrl(url) {
         var parts = url.toString().split("/")
@@ -101,7 +89,6 @@ ApplicationWindow {
         if (index < 0 || index >= playlistModel.count) return
         currentTrackIndex = index
 
-        // Резкое заглушение
         fadeIn.stop()
         audioOut.volume = 0
 
@@ -145,7 +132,7 @@ ApplicationWindow {
         }
     }
 
-    // UI
+    // UI 
     Rectangle {
         anchors.fill: parent
         color: "#1e1e2e"
@@ -186,120 +173,26 @@ ApplicationWindow {
                 }
             }
 
-            // ПЛЕЙЛИСТ
-            Rectangle {
+            // Список
+            PlaylistView {
                 width: parent.width
                 height: 200
-                color: "#2a2a3e"
-                radius: 8
-                border.color: "#45475a"
-                border.width: 1
-
-                ListView {
-                    id: playlistView
-                    anchors.fill: parent
-                    anchors.margins: 4
-                    clip: true
-                    spacing: 2
-                    model: playlistModel
-
-                    delegate: Rectangle {
-                        width: playlistView.width
-                        height: 36
-                        radius: 4
-                        color: index === currentTrackIndex ? "#3a3a5e" : "transparent"
-
-                        Text {
-                            anchors.verticalCenter: parent.verticalCenter
-                            anchors.left: parent.left
-                            anchors.leftMargin: 12
-                            anchors.right: parent.right
-                            anchors.rightMargin: 12
-                            text: (index + 1) + ". " + title
-                            color: "white"
-                            font.pixelSize: 14
-                            elide: Text.ElideRight
-                        }
-
-                        MouseArea {
-                            anchors.fill: parent
-                            onClicked: root.playTrackAt(index)
-                        }
-                    }
-                }
-
-                Text {
-                    anchors.centerIn: parent
-                    visible: playlistModel.count === 0
-                    text: "Плейлист пуст. Нажмите «Добавить треки»."
-                    color: "#6c7086"
-                    font.pixelSize: 14
-                }
+                listModel: playlistModel
+                currentIndex: root.currentTrackIndex
+                onTrackClicked: root.playTrackAt(index)
             }
 
-            Text {
-                anchors.horizontalCenter: parent.horizontalCenter
-                color: "#a6adc8"
-                font.pixelSize: 14
-                text: player.source === ""
-                      ? "Трек не выбран"
-                      : fmt(player.position) + " / " + fmt(player.duration)
-            }
-
-            // СЛАЙДЕР ПОЗИЦИИ
-            // Изменение позиции — value берётся из seekValue, position игнорируется.
-            Slider {
-                id: positionSlider
+            // Управление
+            PlayerControls {
                 width: parent.width
-                from: 0
-                to: player.duration > 0 ? player.duration : 1
-                value: root.isSeeking ? root.seekValue : player.position
-                onMoved: root.seekValue = value
-
-                onPressedChanged: {
-                    root.isSeeking = pressed
-                    if (!pressed) {
-                        audioOut.volume = 0
-                        player.position = root.seekValue
-                        restoreVolumeTimer.start()
-                    }
-                }
-            }
-
-            // КНОПКИ УПРАВЛЕНИЯ
-            Row {
-                anchors.horizontalCenter: parent.horizontalCenter
-                spacing: 12
-
-                Button {
-                    text: "◀"
-                    implicitWidth: 60
-                    onClicked: root.prevTrack()
-                }
-
-                // implicitWidth фиксирует ширину — иначе смена текста
-                Button {
-                    text: player.playbackState === MediaPlayer.PlayingState
-                          ? "Пауза" : "Играть"
-                    implicitWidth: 100
-                    onClicked: {
-                        if (player.playbackState === MediaPlayer.PlayingState)
-                            player.pause()
-                        else
-                            player.play()
-                    }
-                }
-
-                Button {
-                    text: "Стоп"
-                    implicitWidth: 80
-                    onClicked: player.stop()
-                }
-
-                Button {
-                    text: "▶"
-                    implicitWidth: 60
-                    onClicked: root.nextTrack()
+                player: player
+                audioOut: audioOut
+                onPrevClicked: root.prevTrack()
+                onNextClicked: root.nextTrack()
+                onSeekRequested: function(pos) {
+                    audioOut.volume = 0
+                    player.position = pos
+                    restoreVolumeTimer.start()
                 }
             }
         }

@@ -12,21 +12,16 @@ from PySide6.QtQml import QQmlApplicationEngine
 
 
 def main() -> int:
-    # QGuiApplication - базовое приложение Qt, одно на процесс.
+    # QGuiApplication - базовое приложение Qt, одно на процесс
     app = QGuiApplication(sys.argv)
 
-    # Движок QML: загрузит qml/main.qml и построит по нему дерево объектов.
+    # Движок QML: загрузит qml/main.qml и построит по нему дерево объектов
     engine = QQmlApplicationEngine()
 
-    # Путь к main.qml строим через Path(__file__).parent, а не строкой
-    # "qml/main.qml". Так путь не зависит от того, из какой папки запущен
-    # скрипт.
+    # Путь к main.qml через Path(__file__).parent так путь не зависит от того, из какой папки запущен скрипт
     qml_file = Path(__file__).parent / "qml" / "main.qml"
     engine.load(qml_file)
 
-    # Если QML не загрузился (например, из-за синтаксической ошибки),
-    # rootObjects() пуст. Выходим с кодом ошибки, чтобы это было видно,
-    # а не молча висело.
     if not engine.rootObjects():
         return -1
 

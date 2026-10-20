@@ -13,6 +13,10 @@ from PySide6.QtQml import QQmlApplicationEngine
 
 from backend.bridge import Bridge
 
+import os
+# в Qt 6 по умолчанию на Windows используется Direct3D 11
+os.environ["QSG_RHI_BACKEND"] = "opengl"
+
 
 def main() -> int:
     app = QGuiApplication(sys.argv)

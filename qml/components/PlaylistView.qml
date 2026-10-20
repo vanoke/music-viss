@@ -12,7 +12,7 @@ Rectangle {
     // Индекс текущего трека для подсветки
     property int currentIndex: -1
 
-    // Наружу: клик по треку с номером index
+    // в main.qml: клик по треку с номером index
     signal trackClicked(int index)
 
     color: "#2a2a3e"
@@ -34,10 +34,27 @@ Rectangle {
             radius: 4
             color: index === root.currentIndex ? "#3a3a5e" : "transparent"
 
+
+            // Миниатюра обложки. Появляется автоматически, когда в модели обновляется coverPath
+            Image {
+                id: coverImg
+                width: 32
+                height: 32
+                anchors.left: parent.left
+                anchors.leftMargin: 4
+                anchors.verticalCenter: parent.verticalCenter
+                source: coverPath ? "file:///" + coverPath : ""
+                fillMode: Image.PreserveAspectCrop
+                visible: coverPath !== ""
+
+                asynchronous: true
+            }
+
             Text {
                 anchors.verticalCenter: parent.verticalCenter
-                anchors.left: parent.left
-                anchors.leftMargin: 12
+                // если обложку видно, текст сдвигается правее
+                anchors.left: coverPath ? coverImg.right : parent.left
+                anchors.leftMargin: 8
                 anchors.right: parent.right
                 anchors.rightMargin: 12
                 // artist может быть пустой, тогда только название

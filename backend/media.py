@@ -38,19 +38,39 @@ class MediaFile:
             print(f"[MediaFile] не удалось открыть {self.path}: {e}")
             return result
 
-        if not audio.tags:
-            return result
+        # 1. попытка взять теги из файла
+        if audio.tags:
+            if "TIT2" in audio.tags:
+                result["title"] = str(audio.tags["TIT2"])
+            if "TPE1" in audio.tags:
+                result["artist"] = str(audio.tags["TPE1"])
+            
+            cover_path = self._extract_cover(audio)
+            if cover_path:
+                result["coverPath"] = cover_path
 
-        if "TIT2" in audio.tags:
-            result["title"] = str(audio.tags["TIT2"])
-        if "TPE1" in audio.tags:
-            result["artist"] = str(audio.tags["TPE1"])
-
-        cover_path = self._extract_cover(audio)
-        if cover_path:
-            result["coverPath"] = cover_path
+        # 2. нет тегов - парс имени файла
+        if not result["title"] or not result["artist"]:
+            fallback_title, fallback_artist = self._parse_filename()
+            if not result["title"]:
+                result["title"] = fallback_title
+            if not result["artist"]:
+                result["artist"] = fallback_artist
 
         return result
+
+    def _parse_filename(self):
+        filename = Path(self.path).stem
+        
+        if " - " in filename:
+            parts = filename.split(" - ", 1)
+            artist = parts[0].strip()
+            title = parts[1].strip()
+            return title, artist
+            
+        return filename, ""
+
+
 
     def _extract_cover(self, audio: MP3) -> str:
         # может быть несколько APIC-кадров, берется первый

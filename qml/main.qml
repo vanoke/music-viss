@@ -1,5 +1,5 @@
-// Этап 4: интеграция с Python (mutagen)
-// Модуль 2.4 (Компоненты), 4.1 (Работа с файлами), мост QML-Python
+// Этап 4: интеграция с Python (mutagen).
+// Модуль 2.4 (Компоненты), 4.1 (Работа с файлами), плюс мост QML↔Python.
 
 import QtQuick
 import QtQuick.Controls
@@ -19,7 +19,28 @@ ApplicationWindow {
     Material.theme: Material.Dark
     Material.accent: Material.Blue
 
-    //      ЛОГИКА
+    // ловится сигнал из Python, когда обложка скачается
+    Connections {
+        target: bridge
+        function onTrackInfoDownloaded(fileUrl, coverPath, correctedTitle, correctedArtist) {
+            for (var i = 0; i < playlistModel.count; i++) {
+                if (playlistModel.get(i).path === fileUrl) {
+                    // обновляется обложка, если она есть
+                    if (coverPath) {
+                        playlistModel.setProperty(i, "coverPath", coverPath)
+                    }
+                    // всегда обновляются названия, если iTunes их нашел
+                    if (correctedTitle) {
+                        playlistModel.setProperty(i, "title", correctedTitle)
+                    }
+                    if (correctedArtist) {
+                        playlistModel.setProperty(i, "artist", correctedArtist)
+                    }
+                    break
+                }
+            }
+        }
+    }
 
     // МЕДИАПЛЕЕР
     MediaPlayer {
@@ -43,6 +64,7 @@ ApplicationWindow {
     }
 
     // ПЛАВНОЕ НАРАСТАНИЕ ПОСЛЕ СТАРТА
+    // резкая заглушка перед сменой, тут плавный возврат
     NumberAnimation {
         id: fadeIn
         target: audioOut
@@ -60,7 +82,7 @@ ApplicationWindow {
     }
 
     // ТАЙМЕР СМЕНЫ ТРЕКА
-    // за это время FFmpeg освободит поток
+    // 50 мс после приглушения - за это время FFmpeg освободит поток
     Timer {
         id: switchTrackTimer
         interval: 50
@@ -79,8 +101,10 @@ ApplicationWindow {
 
     property int currentTrackIndex: -1
 
-    // Свойства для слайдера: при перетаскивании - игнор player.position. от дергания. теперь в PlayerControls.qml 
-    // УТИЛИТА: миллисекунды в "м:сс" теперь в PlayerControls.qml
+    // Свойства для слайдера: при перетаскивании - игнор player.position. от дергания
+    // (теперь они внутри PlayerControls.qml, оставлены тут для контекста, тк удалены лишние свойства из main.qml)
+    // УТИЛИТА: миллисекунды в "м:сс"
+    // (также в PlayerControls.qml, тк используется только там)
 
     // УТИЛИТА: имя файла из URL
     function fileNameFromUrl(url) {
@@ -127,18 +151,22 @@ ApplicationWindow {
             for (var i = 0; i < selectedFiles.length; i++) {
                 var url = selectedFiles[i].toString()
 
-                // ЭТАП 4 МОСТ. вызов Python-моста для чтения тегов
+                // вызов Python-моста для чтения тегов
                 // bridge.readTags(url) возвращает объект {title, artist, coverPath}
                 var tags = bridge.readTags(url)
 
                 playlistModel.append({
-                    // Если тега нет (tags.title пустой), используем имя файла
+                    // если tags.title пустой, используется имя файла
                     title: tags.title || fileNameFromUrl(url),
                     // сохранение исполнителя и путь к обложке в модель
                     artist: tags.artist || "",
                     coverPath: tags.coverPath || "",
                     path: url
                 })
+
+                if (!tags.coverPath) {
+                    bridge.fetchInfo(url, tags.artist, tags.title)
+                }
             }
             if (currentTrackIndex === -1 && playlistModel.count > 0) {
                 playTrackAt(0)
@@ -146,7 +174,7 @@ ApplicationWindow {
         }
     }
 
-    //      UI
+    // UI
     Rectangle {
         anchors.fill: parent
         color: "#1e1e2e"
@@ -188,17 +216,19 @@ ApplicationWindow {
             }
 
             // ПЛЕЙЛИСТ
-            // Компонент получает модель и индекс, а при клике отправляет сигнал trackClicked
+            // (код ListView и делегата теперь в components/PlaylistView.qml)
+            // компонент получает модель и индекс, а при клике отправляет сигнал trackClicked
             PlaylistView {
                 width: parent.width
                 height: 200
                 listModel: playlistModel
                 currentIndex: root.currentTrackIndex
-                onTrackClicked: root.playTrackAt(index)
+                onTrackClicked: function(index) { root.playTrackAt(index) }
             }
 
             // СЛАЙДЕР ПОЗИЦИИ и КНОПКИ УПРАВЛЕНИЯ
-            // Компонент получает плеер и аудиовыход, а наружу отправляет сигналы
+            // (в components/PlayerControls.qml)
+            // Компонент получает плеер и аудиовыход, а наружу отправляет сигналы prevClicked, nextClicked и seekRequested.
             PlayerControls {
                 width: parent.width
                 player: player

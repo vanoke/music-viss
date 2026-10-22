@@ -12,7 +12,7 @@ ApplicationWindow {
     id: root
 
     width: 900
-    height: 600
+    height: 750
     visible: true
     title: qsTr("Music Visualizer")
 
@@ -180,16 +180,18 @@ ApplicationWindow {
         color: "#1e1e2e"
 
         Column {
+            id: mainColumn
             anchors.centerIn: parent
             spacing: 20
             width: parent.width * 0.85
 
             Text {
                 anchors.horizontalCenter: parent.horizontalCenter
-                text: "Music Visualizer + Lyrics Sync"
+                text: "Pulse"
                 color: "white"
-                font.pixelSize: 24
+                font.pixelSize: 32
                 font.bold: true
+                font.letterSpacing: 2
             }
 
             Row {
@@ -213,24 +215,36 @@ ApplicationWindow {
                         audioOut.volume = 0.8
                     }
                 }
+
             }
+
 
             // ПЛЕЙЛИСТ
             // (код ListView и делегата теперь в components/PlaylistView.qml)
             // компонент получает модель и индекс, а при клике отправляет сигнал trackClicked
             PlaylistView {
-                width: parent.width
-                height: 200
+                width: mainColumn.width
+                height: 250
                 listModel: playlistModel
                 currentIndex: root.currentTrackIndex
                 onTrackClicked: function(index) { root.playTrackAt(index) }
             }
 
+
+            // Визуализация звука
+            Visualizer {
+                    width: parent.width
+                    height: 80 // область визуализации. ширина у mainColumn
+                    // состояние плеера: если PlayingState - рисует
+                    isPlaying: player.playbackState === MediaPlayer.PlayingState
+            }
+
+
             // СЛАЙДЕР ПОЗИЦИИ и КНОПКИ УПРАВЛЕНИЯ
             // (в components/PlayerControls.qml)
             // Компонент получает плеер и аудиовыход, а наружу отправляет сигналы prevClicked, nextClicked и seekRequested.
             PlayerControls {
-                width: parent.width
+                width: mainColumn.width
                 player: player
                 audioOut: audioOut
                 onPrevClicked: root.prevTrack()
@@ -241,6 +255,9 @@ ApplicationWindow {
                     restoreVolumeTimer.start()
                 }
             }
+
+
+            
         }
     }
 }

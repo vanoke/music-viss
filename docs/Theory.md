@@ -80,3 +80,31 @@
 - **`@Slot(type, result="Type")`** - декоратор, делающий метод вызываемым из QML. Типы: `str`, `int`, `float`, `bool`. Для словарей - `result="QVariantMap"`, для списков - `result="QVariantList"`.
 - **`setContextProperty("bridge", obj)`** - регистрация Python-объекта в QML как глобальной переменной. **До** `engine.load()`.
 - **Разделение ответственности:** `media.py` (чистая логика, без Qt) и `bridge.py` (мост с Qt, без UI). Тестируемо, переиспользуемо, читаемо.
+
+---
+
+## Этап 5. HTTP (iTunes API), Многопоточность, Сигналы
+
+**Модули курса:** 4.4 (HTTP), 2.7 (Многопоточность), Сигналы Qt.
+
+**Изучил:**
+- **HTTP GET:** `requests.get(url, params=...)`. Ответ в **JSON** (`.json()`).
+- **iTunes API:** ищет треки, отдаёт правильные названия и обложки (`artworkUrl100`, меняем на 600x600).
+- **Многопоточность (`threading`):** Сетевые запросы нельзя делать в главном потоке (UI зависнет).
+  - `thread = threading.Thread(target=func)`, `thread.daemon = True`, `thread.start()`.
+- **Сигналы Qt (`Signal(str)`):** Безопасная передача данных из фонового потока в QML.
+  - Python: `self.signal.emit(data)`. QML: `Connections { target: bridge; function onSignalName(data) {} }`.
+- **Обновление модели:** `ListModel.setProperty(index, "role", value)` меняет точечно, не пересоздавая список.
+
+---
+
+## Этап 6. Canvas - Визуализация звука
+
+**Модули курса:** 1.5 (Canvas), 2.3 (Анимации).
+
+**Изучил:**
+- **Canvas:** 2D-холст. `getContext("2d")`, `fillRect()`, `createLinearGradient()`.
+- **Перерисовка:** `requestPaint()`.
+- **Анимация:** `Timer` с интервалом 16 мс (≈60 кадров в секунду, FPS).
+- **Имитация:** Так как MediaPlayer не отдаёт частоты, используем математику (`Math.sin`, `Math.random`) для движения полосок.
+- **Изоляция:** Компонент `Visualizer` не знает о плеере. Он получает `property bool isPlaying` из `main.qml`.

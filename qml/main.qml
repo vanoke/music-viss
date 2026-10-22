@@ -6,15 +6,20 @@ import QtQuick.Controls
 import QtQuick.Controls.Material
 import QtQuick.Dialogs
 import QtMultimedia
+import QtQuick.Layouts
 import "components"
+import "utils.js" as Utils 
 
 ApplicationWindow {
     id: root
 
-    width: 900
+    width: 1000
     height: 750
     visible: true
-    title: qsTr("Music Visualizer")
+    title: qsTr("Pulse")
+
+    minimumWidth: 800
+    minimumHeight: 600
 
     Material.theme: Material.Dark
     Material.accent: Material.Blue
@@ -61,6 +66,12 @@ ApplicationWindow {
                 root.nextTrack()
             }
         }
+
+        onPositionChanged: {
+            if (lyricsModel.count > 0) {
+                updateCurrentLyric()
+            }
+        }
     }
 
     // ПЛАВНОЕ НАРАСТАНИЕ ПОСЛЕ СТАРТА
@@ -99,7 +110,12 @@ ApplicationWindow {
         id: playlistModel
     }
 
+    ListModel {
+        id: lyricsModel
+    }
+
     property int currentTrackIndex: -1
+    property int currentLyricIndex: -1 // индекс текущей поющейся строки
 
     // Свойства для слайдера: при перетаскивании - игнор player.position. от дергания
     // (теперь они внутри PlayerControls.qml, оставлены тут для контекста, тк удалены лишние свойства из main.qml)
@@ -117,12 +133,49 @@ ApplicationWindow {
         if (index < 0 || index >= playlistModel.count) return
         currentTrackIndex = index
 
+
+        // загрузка LRC при смене трека
+        lyricsModel.clear()
+        currentLyricIndex = -1
+        var item = playlistModel.get(index)
+        var lrcText = bridge.readLRC(item.path)
+
+        if (lrcText) {
+            var parsed = Utils.parseLRC(lrcText)
+            for (var i = 0; i < parsed.length; i++) {
+                lyricsModel.append(parsed[i])
+            }
+        }
+
+
         // Резкое заглушение
         fadeIn.stop()
         audioOut.volume = 0
 
         switchTrackTimer.restart()
     }
+
+
+    // поиск текущей строки
+    function updateCurrentLyric() {
+        var pos = player.position
+        var newIndex = -1
+        
+        // поиск последней строки, время которой меньше текущей позиции
+        for (var i = 0; i < lyricsModel.count; i++) {
+            if (lyricsModel.get(i).time <= pos) {
+                newIndex = i
+            } else {
+                break // далее искать нет смысла
+            }
+        }
+        
+        if (newIndex !== currentLyricIndex) {
+            currentLyricIndex = newIndex
+        }
+    }
+
+
 
     // ФУНКЦИЯ: следующий трек
     function nextTrack() {
@@ -179,11 +232,13 @@ ApplicationWindow {
         anchors.fill: parent
         color: "#1e1e2e"
 
+        // верхняя зона Header
         Column {
-            id: mainColumn
-            anchors.centerIn: parent
-            spacing: 20
-            width: parent.width * 0.85
+            id: headerSection
+            anchors.top: parent.top
+            anchors.topMargin: 20
+            anchors.horizontalCenter: parent.horizontalCenter
+            spacing: 15
 
             Text {
                 anchors.horizontalCenter: parent.horizontalCenter
@@ -209,55 +264,89 @@ ApplicationWindow {
                         fadeIn.stop()
                         switchTrackTimer.stop()
                         playlistModel.clear()
+                        lyricsModel.clear()
                         currentTrackIndex = -1
                         player.stop()
                         player.source = ""
                         audioOut.volume = 0.8
                     }
                 }
-
             }
+        }
 
+        // нижняя зона Footer
+        PlayerControls {
+            id: footerSection
+            anchors.bottom: parent.bottom
+            anchors.bottomMargin: 20
+            anchors.horizontalCenter: parent.horizontalCenter
+            width: Math.min(parent.width * 0.8, 800) // Ограничитель ширины
+
+            // СЛАЙДЕР ПОЗИЦИИ и КНОПКИ УПРАВЛЕНИЯ
+            // (в components/PlayerControls.qml)
+            // Компонент получает плеер и аудиовыход, а наружу отправляет сигналы prevClicked, nextClicked и seekRequested.
+            player: player
+            audioOut: audioOut
+            onPrevClicked: root.prevTrack()
+            onNextClicked: root.nextTrack()
+            onSeekRequested: function(pos) {
+                audioOut.volume = 0
+                player.position = pos
+                restoreVolumeTimer.start()
+            }
+        }
+
+        // центральная зона Body
+        ColumnLayout {
+            id: centerSection
+            anchors.top: headerSection.bottom
+            anchors.bottom: footerSection.top
+            anchors.topMargin: 20
+            anchors.bottomMargin: 20
+            anchors.horizontalCenter: parent.horizontalCenter
+            width: Math.min(parent.width * 0.8, 800) // Ограничитель ширины
+            spacing: 15
 
             // ПЛЕЙЛИСТ
             // (код ListView и делегата теперь в components/PlaylistView.qml)
             // компонент получает модель и индекс, а при клике отправляет сигнал trackClicked
             PlaylistView {
-                width: mainColumn.width
-                height: 250
+                Layout.fillWidth: true
+                Layout.fillHeight: true // cписок занимает всё свободное место
                 listModel: playlistModel
                 currentIndex: root.currentTrackIndex
                 onTrackClicked: function(index) { root.playTrackAt(index) }
             }
 
+            // Блок караоке
+            Rectangle {
+                Layout.fillWidth: true // НОВОЕ
+                Layout.preferredHeight: 140 // НОВОЕ
+                color: "#2a2a3e"
+                radius: 8
+                border.color: "#45475a"
+                border.width: 1
+                
+                LyricsView {
+                    anchors.fill: parent
+                    anchors.margins: 10
+                    lyricsModel: lyricsModel
+                    currentLine: root.currentLyricIndex
 
-            // Визуализация звука
-            Visualizer {
-                    width: parent.width
-                    height: 80 // область визуализации. ширина у mainColumn
-                    // состояние плеера: если PlayingState - рисует
-                    isPlaying: player.playbackState === MediaPlayer.PlayingState
-            }
-
-
-            // СЛАЙДЕР ПОЗИЦИИ и КНОПКИ УПРАВЛЕНИЯ
-            // (в components/PlayerControls.qml)
-            // Компонент получает плеер и аудиовыход, а наружу отправляет сигналы prevClicked, nextClicked и seekRequested.
-            PlayerControls {
-                width: mainColumn.width
-                player: player
-                audioOut: audioOut
-                onPrevClicked: root.prevTrack()
-                onNextClicked: root.nextTrack()
-                onSeekRequested: function(pos) {
-                    audioOut.volume = 0
-                    player.position = pos
-                    restoreVolumeTimer.start()
+                    // клик по тексту для перемотки трека
+                    onLyricClicked: function(timeMs) {
+                        player.position = timeMs
+                    }
                 }
             }
 
-
-            
+            // Визуализация звука
+            Visualizer {
+                Layout.fillWidth: true
+                Layout.preferredHeight: 50
+                // состояние плеера: если PlayingState - рисует
+                isPlaying: player.playbackState === MediaPlayer.PlayingState
+            }
         }
     }
 }

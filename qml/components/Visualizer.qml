@@ -8,19 +8,11 @@ import QtQuick.Controls.Material
 Rectangle {
     id: root
     
-    // передается снаружи, играет ли музыка сейчас
+    // передается снаружи main.qml, играет ли музыка сейчас
     property bool isPlaying: false
     
     color: "transparent"
     
-    // Таймер для обновления анимации (~60 кадров в секунду)
-    Timer {
-        interval: 16
-        running: root.isPlaying
-        repeat: true
-        onTriggered: canvas.requestPaint()
-    }
-
     Canvas {
         id: canvas
         anchors.fill: parent
@@ -41,22 +33,23 @@ Rectangle {
             if (barHeights.length !== barCount) {
                 barHeights = []
                 for (var j = 0; j < barCount; j++) {
-                    barHeights.push(0)
+                    barHeights.push(2)
                 }
             }
             
             // увеличивается фаза для движения волны
-            phase += 0.1
+            phase += 0.15
 
             // рисуется каждый бар
             for (var i = 0; i < barCount; i++) {
-                var targetHeight = 0
+                var targetHeight = 2
                 
                 if (root.isPlaying) {
                     // изменил на волну вместо хаотичности
-                    // синус создает "волну", от индекса бара и фазы
-                    var wave = Math.abs(Math.sin(i * 0.2 + phase))
-                    targetHeight = (Math.random() * 0.3 + wave * 0.7) * height
+                    // мат волна син+кос
+                    var wave1 = Math.sin(i * 0.2 + phase) * 0.5 + 0.5
+                    var wave2 = Math.cos(i * 0.1 - phase * 1.5) * 0.5 + 0.5
+                    targetHeight = (wave1 * 0.5 + wave2 * 0.4 + Math.random() * 0.1) * height
                 }
                 
                 // плавное сглаживание (чтобы полоски не дергались резко)
@@ -77,4 +70,14 @@ Rectangle {
             }
         }
     }
+
+    // работает всегда, чтобы канвас перерис.
+    Timer {
+        interval: 16
+        running: true
+        repeat: true
+        onTriggered: canvas.requestPaint()
+    }
+
+
 }

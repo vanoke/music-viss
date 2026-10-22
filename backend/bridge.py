@@ -45,3 +45,21 @@ class Bridge(QObject):
                 info["correctedTitle"], 
                 info["correctedArtist"]
             )
+
+
+    # Чтение LRC файла
+    @Slot(str, result=str)
+    def readLRC(self, file_url: str) -> str:
+        # URL в путь
+        media = MediaFile(file_url, self.covers_dir)
+        # поиск .lrc с тем же именем
+        lrc_path = Path(media.path).with_suffix('.lrc')
+        
+        if lrc_path.exists():
+            try:
+                # файл читается в кодировке UTF-8
+                return lrc_path.read_text(encoding='utf-8')
+            except Exception as e:
+                print(f"[LRC] Ошибка чтения {lrc_path}: {e}")
+                return ""
+        return ""
